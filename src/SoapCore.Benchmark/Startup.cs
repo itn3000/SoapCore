@@ -29,12 +29,6 @@ namespace SoapCore.Benchmark
 			// var customBinding = new BasicHttpBinding();
 
 			app.UseSoapEndpoint<PingService>("/TestService.asmx", new BasicHttpBinding(), SoapSerializer.DataContractSerializer);
-			// app.UseSoapEndpoint<MarWebSvcSoapImpl>("/marwebsvc/MarWebSvc.asmx", customBinding, SoapSerializer.XmlSerializer);
-
-			app.Run(async (context) =>
-			{
-				await context.Response.WriteAsync("Hello World!");
-			});
 		}
 	}
 }
