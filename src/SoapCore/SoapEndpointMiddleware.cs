@@ -199,11 +199,20 @@ namespace SoapCore
 
 					// Invoke Operation method
 					var responseObject = operation.DispatchMethod.Invoke(serviceInstance, allArgs);
-					if (operation.DispatchMethod.ReturnType.IsConstructedGenericType && operation.DispatchMethod.ReturnType.GetGenericTypeDefinition() == typeof(Task<>))
+					// if (operation.DispatchMethod.ReturnType.IsConstructedGenericType && operation.DispatchMethod.ReturnType.GetGenericTypeDefinition() == typeof(Task<>))
+					// {
+					// 	var responseTask = (Task)responseObject;
+					// 	await responseTask;
+					// 	responseObject = responseTask.GetType().GetProperty("Result").GetValue(responseTask);
+					// }
+					if (operation.IsReturnTask)
 					{
 						var responseTask = (Task)responseObject;
 						await responseTask;
-						responseObject = responseTask.GetType().GetProperty("Result").GetValue(responseTask);
+						if (operation.TaskResultPropertyInfo != null)
+						{
+							responseObject = operation.TaskResultPropertyInfo.GetValue(responseTask);
+						}
 					}
 					int i = arguments.Length;
 					var resultOutDictionary = new Dictionary<string, object>();
@@ -239,7 +248,7 @@ namespace SoapCore
 
 		private object[] GetRequestArguments(Message requestMessage, System.Xml.XmlDictionaryReader xmlReader, OperationDescription operation, ref Dictionary<string, object> outArgs)
 		{
-			var parameters = operation.DispatchMethod.GetParameters().Where(x => !x.IsOut && !x.ParameterType.IsByRef).ToArray();
+			var parameters = operation.Parameters;
 			var arguments = new List<object>();
 
 			// Find the element for the operation's data
@@ -262,13 +271,15 @@ namespace SoapCore
 						var elementType = parameters[i].ParameterType.GetElementType();
 						if (elementType == null || parameters[i].ParameterType.IsArray)
 							elementType = parameters[i].ParameterType;
-
+						// var serializer = operation.SoapSerializerFactory.Get(_serializer, parameterName, parameterNs, elementType);
+						// arguments.Add(serializer.Deserialize(xmlReader));
 						switch (_serializer)
 						{
 							case SoapSerializer.XmlSerializer:
 								{
 									// see https://referencesource.microsoft.com/System.Xml/System/Xml/Serialization/XmlSerializer.cs.html#c97688a6c07294d5
 									var serializer = new XmlSerializer(elementType, null, new Type[0], new XmlRootAttribute(parameterName), parameterNs);
+									// var serializer = operation.SoapSerializerFactory.Get(_serializer, parameterName, parameterNs, elementType);
 									arguments.Add(serializer.Deserialize(xmlReader));
 								}
 								break;
@@ -276,6 +287,8 @@ namespace SoapCore
 								{
 									var serializer = new DataContractSerializer(elementType, parameterName, parameterNs);
 									arguments.Add(serializer.ReadObject(xmlReader, verifyObjectName: true));
+									// var serializer = operation.SoapSerializerFactory.Get(_serializer, parameterName, parameterNs, elementType);
+									// arguments.Add(serializer.Deserialize(xmlReader));
 								}
 								break;
 							default: throw new NotImplementedException();
@@ -288,7 +301,7 @@ namespace SoapCore
 				}
 			}
 
-			var outParams = operation.DispatchMethod.GetParameters().Where(x => x.IsOut || x.ParameterType.IsByRef).ToArray();
+			var outParams = operation.OutParameters;
 			foreach (var parameterInfo in outParams)
 			{
 				if (parameterInfo.ParameterType.Name == "Guid&")

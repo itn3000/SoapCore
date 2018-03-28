@@ -5,7 +5,8 @@
     <TargetFramework>netcoreapp2.0</TargetFramework>
   </PropertyGroup>
 	<ItemGroup>
-		<ProjectReference Include="../SoapCore/SoapCore.csproj" />
+		<ProjectReference Include="../SoapCore/SoapCore.csproj">
+		</ProjectReference>
 	</ItemGroup>
 	<ItemGroup>
 	  <PackageReference Include="BenchmarkDotNet" Version="0.10.13" />
