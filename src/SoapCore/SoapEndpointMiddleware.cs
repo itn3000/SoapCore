@@ -254,6 +254,7 @@ namespace SoapCore
 			return responseMessage;
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private object[] GetRequestArguments(Message requestMessage, System.Xml.XmlDictionaryReader xmlReader, OperationDescription operation, ref Dictionary<string, object> outArgs)
 		{
 			var parameters = operation.Parameters;
