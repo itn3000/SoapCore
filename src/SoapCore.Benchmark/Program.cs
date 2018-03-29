@@ -10,12 +10,14 @@ using System.Text;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
 using BenchmarkDotNet.Attributes.Jobs;
+using BenchmarkDotNet.Diagnosers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace SoapCore.Benchmark
 {
-	[ShortRunJob]
+	[MemoryDiagnoser]
+	[SimpleJob(targetCount: 5)]
 	public class EchoBench
 	{
 		// 0 measures overhead of creating host
@@ -35,24 +37,50 @@ namespace SoapCore.Benchmark
 				.UseStartup<Startup>();
 			return new TestServer(builder);
 		}
+		TestServer m_Host;
+		[GlobalSetup]
+		public void Setup()
+		{
+			m_Host = CreateTestHost();
+		}
+		[GlobalCleanup]
+		public void Cleanup()
+		{
+			m_Host.Dispose();
+		}
 		[Benchmark]
 		public async Task Echo()
 		{
-			using(var host = CreateTestHost())
+			// using(var host = CreateTestHost())
+			// {
+			// 	for (int i = 0; i < LoopNum; i++)
+			// 	{
+			// 		using(var content = new StringContent(EchoContent, Encoding.UTF8, "text/xml"))
+			// 		{
+			// 			using(var res = await host.CreateRequest("/TestService.asmx")
+			// 				.AddHeader("SOAPAction", "http://example.org/PingService/Echo")
+			// 				.And(msg =>
+			// 				{
+			// 					msg.Content = content;
+			// 				}).PostAsync().ConfigureAwait(false))
+			// 			{
+			// 				res.EnsureSuccessStatusCode();
+			// 			}
+			// 		}
+			// 	}
+			// }
+			for (int i = 0; i < LoopNum; i++)
 			{
-				for (int i = 0; i < LoopNum; i++)
+				using (var content = new StringContent(EchoContent, Encoding.UTF8, "text/xml"))
 				{
-					using(var content = new StringContent(EchoContent, Encoding.UTF8, "text/xml"))
-					{
-						using(var res = await host.CreateRequest("/TestService.asmx")
-							.AddHeader("SOAPAction", "http://example.org/PingService/Echo")
-							.And(msg =>
-							{
-								msg.Content = content;
-							}).PostAsync().ConfigureAwait(false))
+					using (var res = await m_Host.CreateRequest("/TestService.asmx")
+						.AddHeader("SOAPAction", "http://example.org/PingService/Echo")
+						.And(msg =>
 						{
-							res.EnsureSuccessStatusCode();
-						}
+							msg.Content = content;
+						}).PostAsync().ConfigureAwait(false))
+					{
+						res.EnsureSuccessStatusCode();
 					}
 				}
 			}
