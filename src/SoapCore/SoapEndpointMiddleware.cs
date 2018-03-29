@@ -151,12 +151,20 @@ namespace SoapCore
 			Message responseMessage;
 
 			//Reload the body to ensure we have the full message
-			using (var reader = new StreamReader(httpContext.Request.Body))
-			{
-				var body = await reader.ReadToEndAsync();
-				var requestData = Encoding.UTF8.GetBytes(body);
-				httpContext.Request.Body = new MemoryStream(requestData);
-			}
+			// using (var reader = new StreamReader(httpContext.Request.Body))
+			// {
+			// 	var mstm = new MemoryStream();
+			// 	await httpContext.Request.Body.CopyToAsync(mstm).ConfigureAwait(false);
+			// 	mstm.Seek(0, SeekOrigin.Begin);
+			// 	httpContext.Request.Body = mstm;
+			// 	var body = await reader.ReadToEndAsync();
+			// 	var requestData = Encoding.UTF8.GetBytes(body);
+			// 	httpContext.Request.Body = new MemoryStream(requestData);
+			// }
+			var mstm = new MemoryStream();
+			await httpContext.Request.Body.CopyToAsync(mstm).ConfigureAwait(false);
+			mstm.Seek(0, SeekOrigin.Begin);
+			httpContext.Request.Body = mstm;
 
 			//Return metadata if no request
 			if (httpContext.Request.Body.Length == 0)
