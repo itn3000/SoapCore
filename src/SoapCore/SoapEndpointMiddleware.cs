@@ -223,7 +223,7 @@ namespace SoapCore
 					}
 
 					// Create response message
-					var resultName = operation.DispatchMethod.ReturnParameter.GetCustomAttribute<MessageParameterAttribute>()?.Name ?? operation.Name + "Result";
+					var resultName = operation.ReturnName;
 					var bodyWriter = new ServiceBodyWriter(_serializer, operation.Contract.Namespace, operation.Name + "Response", resultName, responseObject, resultOutDictionary);
 					responseMessage = Message.CreateMessage(_messageEncoder.MessageVersion, null, bodyWriter);
 					responseMessage = new CustomMessage(responseMessage);
@@ -256,11 +256,9 @@ namespace SoapCore
 
 			for (int i = 0; i < parameters.Length; i++)
 			{
-				var elementAttribute = parameters[i].GetCustomAttribute<XmlElementAttribute>();
-				var parameterName = !string.IsNullOrEmpty(elementAttribute?.ElementName)
-										? elementAttribute.ElementName
-										: parameters[i].GetCustomAttribute<MessageParameterAttribute>()?.Name ?? parameters[i].Name;
-				var parameterNs = elementAttribute?.Namespace ?? operation.Contract.Namespace;
+				// var elementAttribute = parameters[i].GetCustomAttribute<XmlElementAttribute>();
+				var parameterName = parameters[i].Name;
+				var parameterNs = parameters[i].Namespace;
 
 				if (xmlReader.IsStartElement(parameterName, parameterNs))
 				{
@@ -268,9 +266,9 @@ namespace SoapCore
 
 					if (xmlReader.IsStartElement(parameterName, parameterNs))
 					{
-						var elementType = parameters[i].ParameterType.GetElementType();
-						if (elementType == null || parameters[i].ParameterType.IsArray)
-							elementType = parameters[i].ParameterType;
+						var elementType = parameters[i].Parameter.ParameterType.GetElementType();
+						if (elementType == null || parameters[i].Parameter.ParameterType.IsArray)
+							elementType = parameters[i].Parameter.ParameterType;
 						// var serializer = operation.SoapSerializerFactory.Get(_serializer, parameterName, parameterNs, elementType);
 						// arguments.Add(serializer.Deserialize(xmlReader));
 						switch (_serializer)
@@ -304,13 +302,13 @@ namespace SoapCore
 			var outParams = operation.OutParameters;
 			foreach (var parameterInfo in outParams)
 			{
-				if (parameterInfo.ParameterType.Name == "Guid&")
+				if (parameterInfo.Parameter.ParameterType.Name == "Guid&")
 					outArgs[parameterInfo.Name] = Guid.Empty;
-				else if (parameterInfo.ParameterType.Name == "String&" || parameterInfo.ParameterType.GetElementType().IsArray)
+				else if (parameterInfo.Parameter.ParameterType.Name == "String&" || parameterInfo.Parameter.ParameterType.GetElementType().IsArray)
 					outArgs[parameterInfo.Name] = null;
 				else
 				{
-					var type = parameterInfo.ParameterType.GetElementType();
+					var type = parameterInfo.Parameter.ParameterType.GetElementType();
 					outArgs[parameterInfo.Name] = Activator.CreateInstance(type);
 				}
 			}

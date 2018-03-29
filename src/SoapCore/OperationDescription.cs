@@ -60,6 +60,18 @@ namespace SoapCore
 			});
 		}
 	}
+	public class SoapParameterInfo
+	{
+		public ParameterInfo Parameter { get; private set; }
+		public string Name { get; private set; }
+		public string Namespace { get; private set; }
+		public SoapParameterInfo(ParameterInfo info, string name, string ns)
+		{
+			Parameter = info;
+			Name = name;
+			Namespace = ns;
+		}
+	}
 	public class OperationDescription
 	{
 		public ContractDescription Contract { get; private set; }
@@ -71,10 +83,11 @@ namespace SoapCore
 		public bool IsReturnTask { get; private set; }
 		public PropertyInfo TaskResultPropertyInfo { get; private set; }
 		public PropertyInfo HeaderProperty { get; private set; }
-		public ParameterInfo[] Parameters { get; private set; }
-		public ParameterInfo[] OutParameters { get; private set; }
+		public SoapParameterInfo[] Parameters { get; private set; }
+		public SoapParameterInfo[] OutParameters { get; private set; }
 
 		public BodySerializerFactory SoapSerializerFactory { get; private set; }
+		public string ReturnName {get;private set;}
 
 		public OperationDescription(ContractDescription contract, MethodInfo operationMethod, OperationContractAttribute contractAttribute)
 		{
@@ -89,9 +102,30 @@ namespace SoapCore
 				IsReturnTask = true;
 			}
 			TaskResultPropertyInfo = DispatchMethod.ReturnType.GetProperty("Result");
-			Parameters = DispatchMethod.GetParameters().Where(x => !x.IsOut && !x.ParameterType.IsByRef).ToArray();
-			OutParameters = DispatchMethod.GetParameters().Where(x => x.IsOut || x.ParameterType.IsByRef).ToArray();
+			Parameters = DispatchMethod.GetParameters().Where(x => !x.IsOut && !x.ParameterType.IsByRef)
+				.Select(info =>
+				{
+					var elementAttribute = info.GetCustomAttribute<XmlElementAttribute>();
+					var parameterName = !string.IsNullOrEmpty(elementAttribute?.ElementName)
+											? elementAttribute.ElementName
+											: info.GetCustomAttribute<MessageParameterAttribute>()?.Name ?? info.Name;
+					var parameterNs = elementAttribute?.Namespace ?? Contract.Namespace;
+					return new SoapParameterInfo(info, parameterName, parameterNs);
+				})
+				.ToArray();
+			OutParameters = DispatchMethod.GetParameters().Where(x => x.IsOut || x.ParameterType.IsByRef)
+				.Select(info =>
+				{
+					var elementAttribute = info.GetCustomAttribute<XmlElementAttribute>();
+					var parameterName = !string.IsNullOrEmpty(elementAttribute?.ElementName)
+											? elementAttribute.ElementName
+											: info.GetCustomAttribute<MessageParameterAttribute>()?.Name ?? info.Name;
+					var parameterNs = elementAttribute?.Namespace ?? Contract.Namespace;
+					return new SoapParameterInfo(info, parameterName, parameterNs);
+				})
+				.ToArray();
 			SoapSerializerFactory = new BodySerializerFactory();
+			ReturnName = DispatchMethod.ReturnParameter.GetCustomAttribute<MessageParameterAttribute>()?.Name ?? Name + "Result";
 		}
 	}
 }
