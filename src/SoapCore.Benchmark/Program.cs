@@ -49,26 +49,27 @@ namespace SoapCore.Benchmark
 			m_Host.Dispose();
 		}
 		[Benchmark]
+		public async Task EmptyTask()
+		{
+			for (int i = 0; i < LoopNum; i++)
+			{
+				using (var content = new StringContent(EchoContent, Encoding.UTF8, "text/xml"))
+				{
+					using (var res = await m_Host.CreateRequest("/")
+						.AddHeader("SOAPAction", "http://example.org/PingService/Echo")
+						.And(msg =>
+						{
+							msg.Content = content;
+						}).PostAsync().ConfigureAwait(false))
+					{
+						res.EnsureSuccessStatusCode();
+					}
+				}
+			}
+		}
+		[Benchmark]
 		public async Task Echo()
 		{
-			// using(var host = CreateTestHost())
-			// {
-			// 	for (int i = 0; i < LoopNum; i++)
-			// 	{
-			// 		using(var content = new StringContent(EchoContent, Encoding.UTF8, "text/xml"))
-			// 		{
-			// 			using(var res = await host.CreateRequest("/TestService.asmx")
-			// 				.AddHeader("SOAPAction", "http://example.org/PingService/Echo")
-			// 				.And(msg =>
-			// 				{
-			// 					msg.Content = content;
-			// 				}).PostAsync().ConfigureAwait(false))
-			// 			{
-			// 				res.EnsureSuccessStatusCode();
-			// 			}
-			// 		}
-			// 	}
-			// }
 			for (int i = 0; i < LoopNum; i++)
 			{
 				using (var content = new StringContent(EchoContent, Encoding.UTF8, "text/xml"))

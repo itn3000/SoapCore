@@ -29,6 +29,10 @@ namespace SoapCore.Benchmark
 			// var customBinding = new BasicHttpBinding();
 
 			app.UseSoapEndpoint<PingService>("/TestService.asmx", new BasicHttpBinding(), SoapSerializer.DataContractSerializer);
+			app.Use(async (ctx, next) =>
+			{
+				await ctx.Response.WriteAsync("").ConfigureAwait(false);
+			});
 		}
 	}
 }
