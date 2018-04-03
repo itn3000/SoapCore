@@ -151,12 +151,16 @@ namespace SoapCore
 			Message responseMessage;
 
 			//Reload the body to ensure we have the full message
-			using (var reader = new StreamReader(httpContext.Request.Body))
-			{
-				var body = await reader.ReadToEndAsync();
-				var requestData = Encoding.UTF8.GetBytes(body);
-				httpContext.Request.Body = new MemoryStream(requestData);
-			}
+			var mstm = new MemoryStream();
+			await httpContext.Request.Body.CopyToAsync(mstm).ConfigureAwait(false);
+			mstm.Seek(0, SeekOrigin.Begin);
+			httpContext.Request.Body = mstm;
+			// using (var reader = new StreamReader(httpContext.Request.Body))
+			// {
+			// 	var body = await reader.ReadToEndAsync();
+			// 	var requestData = Encoding.UTF8.GetBytes(body);
+			// 	httpContext.Request.Body = new MemoryStream(requestData);
+			// }
 
 			//Return metadata if no request
 			if (httpContext.Request.Body.Length == 0)
@@ -199,12 +203,12 @@ namespace SoapCore
 
 					// Invoke Operation method
 					var responseObject = operation.DispatchMethod.Invoke(serviceInstance, allArgs);
-					if (operation.DispatchMethod.ReturnType.IsConstructedGenericType && operation.DispatchMethod.ReturnType.GetGenericTypeDefinition() == typeof(Task<>))
-					{
-						var responseTask = (Task)responseObject;
-						await responseTask;
-						responseObject = responseTask.GetType().GetProperty("Result").GetValue(responseTask);
-					}
+					// if (operation.DispatchMethod.ReturnType.IsConstructedGenericType && operation.DispatchMethod.ReturnType.GetGenericTypeDefinition() == typeof(Task<>))
+					// {
+					// 	var responseTask = (Task)responseObject;
+					// 	await responseTask;
+					// 	responseObject = responseTask.GetType().GetProperty("Result").GetValue(responseTask);
+					// }
 					int i = arguments.Length;
 					var resultOutDictionary = new Dictionary<string, object>();
 					foreach (var outArg in outArgs)
@@ -214,7 +218,8 @@ namespace SoapCore
 					}
 
 					// Create response message
-					var resultName = operation.DispatchMethod.ReturnParameter.GetCustomAttribute<MessageParameterAttribute>()?.Name ?? operation.Name + "Result";
+					// var resultName = operation.DispatchMethod.ReturnParameter.GetCustomAttribute<MessageParameterAttribute>()?.Name ?? operation.Name + "Result";
+					var resultName = operation.ReturnName;
 					var bodyWriter = new ServiceBodyWriter(_serializer, operation.Contract.Namespace, operation.Name + "Response", resultName, responseObject, resultOutDictionary);
 					responseMessage = Message.CreateMessage(_messageEncoder.MessageVersion, null, bodyWriter);
 					responseMessage = new CustomMessage(responseMessage);
@@ -237,9 +242,11 @@ namespace SoapCore
 			return responseMessage;
 		}
 
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private object[] GetRequestArguments(Message requestMessage, System.Xml.XmlDictionaryReader xmlReader, OperationDescription operation, ref Dictionary<string, object> outArgs)
 		{
-			var parameters = operation.DispatchMethod.GetParameters().Where(x => !x.IsOut && !x.ParameterType.IsByRef).ToArray();
+			// var parameters = operation.DispatchMethod.GetParameters().Where(x => !x.IsOut && !x.ParameterType.IsByRef).ToArray();
+			var parameters = operation.NormalParameters;
 			var arguments = new List<object>();
 
 			// Find the element for the operation's data
@@ -247,11 +254,13 @@ namespace SoapCore
 
 			for (int i = 0; i < parameters.Length; i++)
 			{
-				var elementAttribute = parameters[i].GetCustomAttribute<XmlElementAttribute>();
-				var parameterName = !string.IsNullOrEmpty(elementAttribute?.ElementName)
-										? elementAttribute.ElementName
-										: parameters[i].GetCustomAttribute<MessageParameterAttribute>()?.Name ?? parameters[i].Name;
-				var parameterNs = elementAttribute?.Namespace ?? operation.Contract.Namespace;
+				// var elementAttribute = parameters[i].GetCustomAttribute<XmlElementAttribute>();
+				// var parameterName = !string.IsNullOrEmpty(elementAttribute?.ElementName)
+				// 						? elementAttribute.ElementName
+				// 						: parameters[i].GetCustomAttribute<MessageParameterAttribute>()?.Name ?? parameters[i].Name;
+				// var parameterNs = elementAttribute?.Namespace ?? operation.Contract.Namespace;
+				var parameterName = parameters[i].Name;
+				var parameterNs = parameters[i].Namespace;
 
 				if (xmlReader.IsStartElement(parameterName, parameterNs))
 				{
@@ -259,9 +268,9 @@ namespace SoapCore
 
 					if (xmlReader.IsStartElement(parameterName, parameterNs))
 					{
-						var elementType = parameters[i].ParameterType.GetElementType();
-						if (elementType == null || parameters[i].ParameterType.IsArray)
-							elementType = parameters[i].ParameterType;
+						var elementType = parameters[i].Parameter.ParameterType.GetElementType();
+						if (elementType == null || parameters[i].Parameter.ParameterType.IsArray)
+							elementType = parameters[i].Parameter.ParameterType;
 
 						switch (_serializer)
 						{
@@ -288,16 +297,15 @@ namespace SoapCore
 				}
 			}
 
-			var outParams = operation.DispatchMethod.GetParameters().Where(x => x.IsOut || x.ParameterType.IsByRef).ToArray();
-			foreach (var parameterInfo in outParams)
+			foreach (var parameterInfo in operation.OutParameters)
 			{
-				if (parameterInfo.ParameterType.Name == "Guid&")
+				if (parameterInfo.Parameter.Name == "Guid&")
 					outArgs[parameterInfo.Name] = Guid.Empty;
-				else if (parameterInfo.ParameterType.Name == "String&" || parameterInfo.ParameterType.GetElementType().IsArray)
+				else if (parameterInfo.Parameter.ParameterType.Name == "String&" || parameterInfo.Parameter.ParameterType.GetElementType().IsArray)
 					outArgs[parameterInfo.Name] = null;
 				else
 				{
-					var type = parameterInfo.ParameterType.GetElementType();
+					var type = parameterInfo.Parameter.ParameterType.GetElementType();
 					outArgs[parameterInfo.Name] = Activator.CreateInstance(type);
 				}
 			}
