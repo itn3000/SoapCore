@@ -151,16 +151,10 @@ namespace SoapCore
 			Message responseMessage;
 
 			//Reload the body to ensure we have the full message
-			var mstm = new MemoryStream();
+			var mstm = new MemoryStream((int)httpContext.Request.ContentLength.GetValueOrDefault(1024));
 			await httpContext.Request.Body.CopyToAsync(mstm).ConfigureAwait(false);
 			mstm.Seek(0, SeekOrigin.Begin);
 			httpContext.Request.Body = mstm;
-			// using (var reader = new StreamReader(httpContext.Request.Body))
-			// {
-			// 	var body = await reader.ReadToEndAsync();
-			// 	var requestData = Encoding.UTF8.GetBytes(body);
-			// 	httpContext.Request.Body = new MemoryStream(requestData);
-			// }
 
 			//Return metadata if no request
 			if (httpContext.Request.Body.Length == 0)
@@ -203,12 +197,12 @@ namespace SoapCore
 
 					// Invoke Operation method
 					var responseObject = operation.DispatchMethod.Invoke(serviceInstance, allArgs);
-					// if (operation.DispatchMethod.ReturnType.IsConstructedGenericType && operation.DispatchMethod.ReturnType.GetGenericTypeDefinition() == typeof(Task<>))
-					// {
-					// 	var responseTask = (Task)responseObject;
-					// 	await responseTask;
-					// 	responseObject = responseTask.GetType().GetProperty("Result").GetValue(responseTask);
-					// }
+					if (operation.DispatchMethod.ReturnType.IsConstructedGenericType && operation.DispatchMethod.ReturnType.GetGenericTypeDefinition() == typeof(Task<>))
+					{
+						var responseTask = (Task)responseObject;
+						await responseTask;
+						responseObject = responseTask.GetType().GetProperty("Result").GetValue(responseTask);
+					}
 					int i = arguments.Length;
 					var resultOutDictionary = new Dictionary<string, object>();
 					foreach (var outArg in outArgs)
