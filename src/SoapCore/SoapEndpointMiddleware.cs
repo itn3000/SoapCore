@@ -193,7 +193,8 @@ namespace SoapCore
 					// Get operation arguments from message
 					Dictionary<string, object> outArgs = new Dictionary<string, object>();
 					var arguments = GetRequestArguments(requestMessage, reader, operation, ref outArgs);
-					var allArgs = arguments.Concat(outArgs.Values).ToArray();
+					// avoid Concat() and ToArray() cost when no out args(this may be heavy operation)
+					var allArgs = outArgs.Count != 0 ? arguments.Concat(outArgs.Values).ToArray() : arguments;
 
 					// Invoke Operation method
 					var responseObject = operation.DispatchMethod.Invoke(serviceInstance, allArgs);
@@ -212,7 +213,6 @@ namespace SoapCore
 					}
 
 					// Create response message
-					// var resultName = operation.DispatchMethod.ReturnParameter.GetCustomAttribute<MessageParameterAttribute>()?.Name ?? operation.Name + "Result";
 					var resultName = operation.ReturnName;
 					var bodyWriter = new ServiceBodyWriter(_serializer, operation.Contract.Namespace, operation.Name + "Response", resultName, responseObject, resultOutDictionary);
 					responseMessage = Message.CreateMessage(_messageEncoder.MessageVersion, null, bodyWriter);
@@ -239,20 +239,15 @@ namespace SoapCore
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 		private object[] GetRequestArguments(Message requestMessage, System.Xml.XmlDictionaryReader xmlReader, OperationDescription operation, ref Dictionary<string, object> outArgs)
 		{
-			// var parameters = operation.DispatchMethod.GetParameters().Where(x => !x.IsOut && !x.ParameterType.IsByRef).ToArray();
 			var parameters = operation.NormalParameters;
-			var arguments = new List<object>();
+			// avoid reallocation
+			var arguments = new List<object>(parameters.Length + operation.OutParameters.Length);
 
 			// Find the element for the operation's data
 			xmlReader.ReadStartElement(operation.Name, operation.Contract.Namespace);
 
 			for (int i = 0; i < parameters.Length; i++)
 			{
-				// var elementAttribute = parameters[i].GetCustomAttribute<XmlElementAttribute>();
-				// var parameterName = !string.IsNullOrEmpty(elementAttribute?.ElementName)
-				// 						? elementAttribute.ElementName
-				// 						: parameters[i].GetCustomAttribute<MessageParameterAttribute>()?.Name ?? parameters[i].Name;
-				// var parameterNs = elementAttribute?.Namespace ?? operation.Contract.Namespace;
 				var parameterName = parameters[i].Name;
 				var parameterNs = parameters[i].Namespace;
 
